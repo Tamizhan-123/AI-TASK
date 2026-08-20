@@ -12,7 +12,7 @@ vectorizer settings and the exact same distance metric; only the chunks fed
 in (i.e. which chunker produced them) differ between the two collections.
 """
 
-from sklearn.feature_extraction.text import TfidfVectorizer
+from embeddings import TfidfEmbedder
 
 
 class Index:
@@ -28,22 +28,9 @@ class Index:
         """
         self.chunks_by_id = {c["chunk_id"]: c for c in chunks}
 
-        # max_df downweights words shared by almost every chunk in this
-        # corpus (every article says "billing", "migration", "cutover",
-        # "account" repeatedly) so a query matching only on that shared
-        # vocabulary does not score artificially high against an unrelated
-        # chunk. sublinear_tf dampens raw term-frequency blowups in the
-        # longer chunks. ngram_range=(1, 2) lets two-word phrases like
-        # "sync error" or "error code" contribute as their own feature.
-        self.vectorizer = TfidfVectorizer(
-            stop_words="english",
-            max_df=0.5,
-            sublinear_tf=True,
-            ngram_range=(1, 2),
-        )
+        self.embedder = TfidfEmbedder()
         texts = [c["text"] for c in chunks]
-        matrix = self.vectorizer.fit_transform(texts)
-        embeddings = matrix.toarray().tolist()
+        embeddings = self.embedder.fit_embed(texts)
 
         # Reset the collection on every run -- this run indexes ONLY the
         # current 6 articles, so the collection must never accumulate
@@ -83,10 +70,10 @@ class Index:
             return []
 
         where = {"product_area": product_area_filter} if product_area_filter else None
-        query_vec = self.vectorizer.transform([query]).toarray().tolist()
+        query_vec = self.embedder.embed_query(query)
 
         result = self.collection.query(
-            query_embeddings=query_vec,
+            query_embeddings=[query_vec],
             n_results=min(k, count),
             where=where,
         )

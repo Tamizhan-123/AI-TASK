@@ -1,0 +1,5 @@
+chromadb
+scikit-learn
+fastapi
+uvicorn
+pydantic
